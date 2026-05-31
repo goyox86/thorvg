@@ -34,7 +34,16 @@
 /************************************************************************/
 
 static int32_t _rendererCnt = -1;
+
+#ifdef THORVG_THREAD_SUPPORT
 static mutex _rendererMtx;
+#else
+// Single-threaded build: replace the global `std::mutex` with a
+// trivially-constructible no-op type so it does not run a static
+// initialiser that calls into pthread stubs before `main()`.
+struct _NullMutex { void lock() noexcept {} void unlock() noexcept {} };
+static _NullMutex _rendererMtx;
+#endif
 
 struct SwTask : Task
 {
