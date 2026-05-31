@@ -23,8 +23,11 @@
 #ifndef _TVG_LOCK_H_
 #define _TVG_LOCK_H_
 
-#include <mutex>
 #include "tvgTaskScheduler.h"
+
+#ifdef THORVG_THREAD_SUPPORT
+    #include <mutex>
+#endif
 
 namespace tvg
 {
@@ -62,29 +65,21 @@ namespace tvg
         }
     };
 #else //THORVG_THREAD_SUPPORT
+    // Single-threaded build: all lock primitives collapse to empty
+    // structs / no-ops so that static-storage `Key` / `StrictKey`
+    // globals do not pull in `<mutex>`, `pthread_*`, or any
+    // libstdc++ thread-safe-static machinery.  Without this fix the
+    // pre-`main()` C++ static initialisers in `tvgSwMemPool.cpp` etc.
+    // construct `std::mutex` objects that in turn call into pthread
+    // stubs and abort on bare-metal targets.  (This matches how LVGL's
+    // vendored copy of ThorVG models the no-threads case.)
     struct Key {};
-
-    struct StrictKey : Key
-    {
-        std::mutex mtx;
-    };
+    struct StrictKey {};
 
     struct ScopedLock
     {
-        StrictKey* key = nullptr;
-
-        ScopedLock(Key& k) {}
-
-        ScopedLock(StrictKey& k)
-        {
-            k.mtx.lock();
-            key = &k;
-        }
-
-        ~ScopedLock()
-        {
-            if (key) key->mtx.unlock();
-        }
+        ScopedLock(Key&) {}
+        ScopedLock(StrictKey&) {}
     };
 #endif //THORVG_THREAD_SUPPORT
 }
